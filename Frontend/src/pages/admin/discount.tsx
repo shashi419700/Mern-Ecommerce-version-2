@@ -41,14 +41,14 @@ const columns: Column<DataType>[] = [
 const Discount = () => {
   const { user } = useSelector((state: RootState) => state.userReducer);
 
-  const {
-    data,
-    loading: isLoading,
-    error,
-  } = useFetchData<AllDiscountResponse>(
-    `${server}/api/v1/payment/coupon/all?id=${user?._id}`,
-    "discount-codes"
-  );
+const { data, loading: isLoading, error } = useFetchData<AllDiscountResponse>({
+  url: user?._id ? `${server}/api/v1/payment/coupon/all?id=${user._id}` : "",
+  key: "discount-codes",
+  dependencyProps: [user?._id ?? ""],
+});
+
+
+
 
   const [rows, setRows] = useState<DataType[]>([]);
 

@@ -12,6 +12,7 @@ import { userExist, userNotExist } from "./redux/reducer/userReducer";
 import { RootState } from "./redux/store";
 import Footer from "./components/footer";
 
+// ✅ Lazy imports
 const Home = lazy(() => import("./pages/home"));
 const Search = lazy(() => import("./pages/search"));
 const ProductDetails = lazy(() => import("./pages/product-details"));
@@ -23,7 +24,7 @@ const OrderDetails = lazy(() => import("./pages/order-details"));
 const NotFound = lazy(() => import("./pages/not-found"));
 const Checkout = lazy(() => import("./pages/checkout"));
 
-// Admin Routes Importing
+// ✅ Admin Routes
 const Dashboard = lazy(() => import("./pages/admin/dashboard"));
 const Products = lazy(() => import("./pages/admin/products"));
 const Customers = lazy(() => import("./pages/admin/customers"));
@@ -36,71 +37,76 @@ const Coupon = lazy(() => import("./pages/admin/apps/coupon"));
 const Stopwatch = lazy(() => import("./pages/admin/apps/stopwatch"));
 const Toss = lazy(() => import("./pages/admin/apps/toss"));
 const NewProduct = lazy(() => import("./pages/admin/management/newproduct"));
-const ProductManagement = lazy(
-  () => import("./pages/admin/management/productmanagement")
-);
-const TransactionManagement = lazy(
-  () => import("./pages/admin/management/transactionmanagement")
-);
-const DiscountManagement = lazy(
-  () => import("./pages/admin/management/discountmanagement")
-);
-
+const ProductManagement = lazy(() => import("./pages/admin/management/productmanagement"));
+const TransactionManagement = lazy(() => import("./pages/admin/management/transactionmanagement"));
+const DiscountManagement = lazy(() => import("./pages/admin/management/discountmanagement"));
 const NewDiscount = lazy(() => import("./pages/admin/management/newdiscount"));
 
 const App = () => {
-  const { user, loading } = useSelector(
-    (state: RootState) => state.userReducer
-  );
-
+  const { user, loading } = useSelector((state: RootState) => state.userReducer);
   const dispatch = useDispatch();
 
+  // ✅ Run once on mount — no infinite loop
   useEffect(() => {
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const data = await getUser(user.uid);
-        dispatch(userExist(data.user));
-      } else dispatch(userNotExist());
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const data = await getUser(firebaseUser.uid);
+          dispatch(userExist(data.user));
+        } catch (error) {
+          console.error("❌ getUser API Error:", error);
+          dispatch(userNotExist());
+        }
+      } else {
+        dispatch(userNotExist());
+      }
     });
-  }, []);
 
-  return loading ? (
-    <Loader />
-  ) : (
+    // cleanup listener
+    return () => unsubscribe();
+  }, [dispatch]);
+
+  // ✅ Loading fallback
+  if (loading) return <Loader />;
+
+  return (
     <Router>
       {/* Header */}
       <Header user={user} />
+
       <Suspense fallback={<LoaderLayout />}>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
-          {/* Not logged In Route */}
+
+          {/* Not logged in */}
           <Route
             path="/login"
             element={
-              <ProtectedRoute isAuthenticated={user ? false : true}>
+              <ProtectedRoute isAuthenticated={!user}>
                 <Login />
               </ProtectedRoute>
             }
           />
-          {/* Logged In User Routes */}
-          <Route
-            element={<ProtectedRoute isAuthenticated={user ? true : false} />}
-          >
+
+          {/* Logged in user */}
+          <Route element={<ProtectedRoute isAuthenticated={!!user} />}>
             <Route path="/shipping" element={<Shipping />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/order/:id" element={<OrderDetails />} />
             <Route path="/pay" element={<Checkout />} />
           </Route>
+
           {/* Admin Routes */}
           <Route
             element={
               <ProtectedRoute
-                isAuthenticated={true}
+                isAuthenticated={!!user}
                 adminOnly={true}
-                admin={user?.role === "admin" ? true : false}
+                admin={user?.role === "admin"}
               />
             }
           >
@@ -114,6 +120,7 @@ const App = () => {
             <Route path="/admin/chart/bar" element={<Barcharts />} />
             <Route path="/admin/chart/pie" element={<Piecharts />} />
             <Route path="/admin/chart/line" element={<Linecharts />} />
+
             {/* Apps */}
             <Route path="/admin/app/coupon" element={<Coupon />} />
             <Route path="/admin/app/stopwatch" element={<Stopwatch />} />
@@ -121,25 +128,17 @@ const App = () => {
 
             {/* Management */}
             <Route path="/admin/product/new" element={<NewProduct />} />
-
             <Route path="/admin/product/:id" element={<ProductManagement />} />
-
-            <Route
-              path="/admin/transaction/:id"
-              element={<TransactionManagement />}
-            />
-
+            <Route path="/admin/transaction/:id" element={<TransactionManagement />} />
             <Route path="/admin/discount/new" element={<NewDiscount />} />
-
-            <Route
-              path="/admin/discount/:id"
-              element={<DiscountManagement />}
-            />
+            <Route path="/admin/discount/:id" element={<DiscountManagement />} />
           </Route>
 
+          {/* Not Found */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+
       <Footer />
       <Toaster position="bottom-center" />
     </Router>

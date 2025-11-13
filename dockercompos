@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis/redis-stack
+    container_name: redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+
+  server:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: server
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./Backend/.env
+    depends_on:
+      # ✅ Fixed spelling
+      - mongodb
+      - redis
+    develop:
+      watch:
+        - path: ./Backend/package*.json
+          action: rebuild
+        - path: ./Backend
+          target: /app
+          action: sync
+    volumes:
+      - redis_data:/data
+
+  client:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: client
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./Frontend/.env
+    develop:
+      watch:
+        - path: ./Frontend/package*.json
+          action: rebuild
+        - path: ./Frontend
+          target: /app
+          action: sync
+
+volumes:
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
